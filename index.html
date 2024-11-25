@@ -27,10 +27,15 @@
             padding: 8px;
             font-size: 16px;
         }
-        .remove-button {
+        .field-buttons {
+            display: flex;
+            flex-shrink: 0;
             margin-left: 10px;
+        }
+        .field-buttons button {
             padding: 8px 12px;
-            font-size: 16px;
+            font-size: 14px;
+            margin-left: 5px;
         }
         #addImageButton {
             margin-top: 10px;
@@ -58,6 +63,12 @@
             font-size: 16px;
             width: 100px;
         }
+        .image-preview {
+            max-width: 100%;
+            max-height: 200px;
+            margin-top: 10px;
+            border: 1px solid #ccc;
+        }
     </style>
 </head>
 <body>
@@ -71,10 +82,7 @@
     <div class="section">
         <h2>Step 2: Enter Image URLs for Screensaver Playlist</h2>
         <div id="imageUrlFields">
-            <div class="image-url-field">
-                <input type="text" placeholder="Enter image URL" class="image-url-input">
-                <button type="button" class="remove-button" onclick="removeImageField(this)">Remove</button>
-            </div>
+            <!-- Image URL fields will be populated here -->
         </div>
         <button type="button" id="addImageButton" onclick="addImageField()">Add Another Image</button>
     </div>
@@ -96,6 +104,12 @@
         <button id="downloadButton" onclick="downloadConfig()">Download JSON File</button>
     </div>
 
+    <!-- Image Preview Modal -->
+    <div id="previewModal" style="display:none; position:fixed; top:10%; left:10%; width:80%; height:80%; background-color:white; border:1px solid #ccc; padding:10px; overflow:auto; z-index:1000;">
+        <span style="float:right; cursor:pointer; font-size:24px;" onclick="closePreview()">&#10005;</span>
+        <img id="previewImage" src="" alt="Image Preview" style="max-width:100%; max-height:100%;">
+    </div>
+
     <script>
         let originalConfig = null;
 
@@ -112,6 +126,7 @@
                     try {
                         originalConfig = JSON.parse(e.target.result);
                         alert('Config file loaded successfully.');
+                        populateImageFieldsFromConfig();
                     } catch (error) {
                         alert('Error parsing JSON file. Please check the file and try again.');
                     }
@@ -120,22 +135,69 @@
             }
         });
 
+        // Function to populate image URL fields from the uploaded config
+        function populateImageFieldsFromConfig() {
+            // Clear existing fields
+            document.getElementById('imageUrlFields').innerHTML = '';
+            // Parse screensaverPlaylist
+            let playlist = [];
+            if (originalConfig.screensaverPlaylist) {
+                try {
+                    playlist = JSON.parse(originalConfig.screensaverPlaylist);
+                } catch (error) {
+                    alert('Error parsing screensaverPlaylist from config.');
+                    return;
+                }
+            }
+            // If playlist is empty, add one empty field
+            if (playlist.length === 0) {
+                addImageField();
+            } else {
+                // Populate fields with URLs from playlist
+                playlist.forEach(item => {
+                    addImageField(item.url);
+                });
+            }
+        }
+
         // Function to add a new image URL input field
-        function addImageField() {
+        function addImageField(url = '') {
             const imageUrlFields = document.getElementById('imageUrlFields');
+            const fieldId = 'imageField_' + Date.now();
             const newField = document.createElement('div');
             newField.className = 'image-url-field';
             newField.innerHTML = `
-                <input type="text" placeholder="Enter image URL" class="image-url-input">
-                <button type="button" class="remove-button" onclick="removeImageField(this)">Remove</button>
+                <input type="text" placeholder="Enter image URL" class="image-url-input" value="${url}" id="${fieldId}">
+                <div class="field-buttons">
+                    <button type="button" onclick="previewImage('${fieldId}')">Preview</button>
+                    <button type="button" onclick="removeImageField(this)">Remove</button>
+                </div>
             `;
             imageUrlFields.appendChild(newField);
         }
 
         // Function to remove an image URL input field
         function removeImageField(button) {
-            const field = button.parentElement;
+            const field = button.closest('.image-url-field');
             field.parentElement.removeChild(field);
+        }
+
+        // Function to preview the image from the URL
+        function previewImage(fieldId) {
+            const url = document.getElementById(fieldId).value.trim();
+            if (url) {
+                const previewImage = document.getElementById('previewImage');
+                previewImage.src = url;
+                document.getElementById('previewModal').style.display = 'block';
+            } else {
+                alert('Please enter a URL to preview.');
+            }
+        }
+
+        // Function to close the image preview
+        function closePreview() {
+            document.getElementById('previewModal').style.display = 'none';
+            document.getElementById('previewImage').src = '';
         }
 
         // Function to generate the updated config
