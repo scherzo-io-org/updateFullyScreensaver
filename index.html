@@ -63,10 +63,22 @@
             font-size: 16px;
             width: 100px;
         }
-        .image-preview {
-            max-width: 100%;
-            max-height: 200px;
-            margin-top: 10px;
+        /* Modal Styles */
+        #previewModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        #previewModal img {
+            max-width: 90%;
+            max-height: 90%;
             border: 1px solid #ccc;
         }
     </style>
@@ -105,13 +117,13 @@
     </div>
 
     <!-- Image Preview Modal -->
-    <div id="previewModal" style="display:none; position:fixed; top:10%; left:10%; width:80%; height:80%; background-color:white; border:1px solid #ccc; padding:10px; overflow:auto; z-index:1000;">
-        <span style="float:right; cursor:pointer; font-size:24px;" onclick="closePreview()">&#10005;</span>
-        <img id="previewImage" src="" alt="Image Preview" style="max-width:100%; max-height:100%;">
+    <div id="previewModal" onclick="closePreview(event)">
+        <img id="previewImage" src="" alt="Image Preview">
     </div>
 
     <script>
         let originalConfig = null;
+        let fieldCounter = 0;
 
         // Function to handle file upload
         document.getElementById('jsonFileInput').addEventListener('change', function(event) {
@@ -125,7 +137,7 @@
                 reader.onload = function(e) {
                     try {
                         originalConfig = JSON.parse(e.target.result);
-                        alert('Config file loaded successfully.');
+                        // alert('Config file loaded successfully.');
                         populateImageFieldsFromConfig();
                     } catch (error) {
                         alert('Error parsing JSON file. Please check the file and try again.');
@@ -139,6 +151,8 @@
         function populateImageFieldsFromConfig() {
             // Clear existing fields
             document.getElementById('imageUrlFields').innerHTML = '';
+            // Reset field counter
+            fieldCounter = 0;
             // Parse screensaverPlaylist
             let playlist = [];
             if (originalConfig.screensaverPlaylist) {
@@ -163,7 +177,7 @@
         // Function to add a new image URL input field
         function addImageField(url = '') {
             const imageUrlFields = document.getElementById('imageUrlFields');
-            const fieldId = 'imageField_' + Date.now();
+            const fieldId = 'imageField_' + fieldCounter++;
             const newField = document.createElement('div');
             newField.className = 'image-url-field';
             newField.innerHTML = `
@@ -187,17 +201,31 @@
             const url = document.getElementById(fieldId).value.trim();
             if (url) {
                 const previewImage = document.getElementById('previewImage');
+                // Remove any existing event handlers
+                previewImage.onload = null;
+                previewImage.onerror = null;
+                previewImage.onload = function() {
+                    document.getElementById('previewModal').style.display = 'flex';
+                };
+                previewImage.onerror = function() {
+                    alert('Failed to load image. Please check the URL.');
+                };
                 previewImage.src = url;
-                document.getElementById('previewModal').style.display = 'block';
             } else {
                 alert('Please enter a URL to preview.');
             }
         }
 
         // Function to close the image preview
-        function closePreview() {
-            document.getElementById('previewModal').style.display = 'none';
-            document.getElementById('previewImage').src = '';
+        function closePreview(event) {
+            if (event.target.id === 'previewModal' || event.target.id === 'previewImage') {
+                const previewImage = document.getElementById('previewImage');
+                // Remove event handlers to prevent 'onerror' from triggering when src is cleared
+                previewImage.onload = null;
+                previewImage.onerror = null;
+                previewImage.src = '';
+                document.getElementById('previewModal').style.display = 'none';
+            }
         }
 
         // Function to generate the updated config
@@ -261,7 +289,7 @@
             const updatedConfigJson = JSON.stringify(originalConfig, null, 4);
             document.getElementById('configOutput').value = updatedConfigJson;
 
-            alert('Updated config generated successfully.');
+            // alert('Updated config generated successfully.');
         }
 
         // Function to download the updated config as a file
