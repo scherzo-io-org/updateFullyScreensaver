@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fully Kiosk Config Updater</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        input[type="file"], input[type="number"], button {
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .image-url-field {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .image-url-input {
+            flex-grow: 1;
+            padding: 8px;
+            font-size: 16px;
+        }
+        .remove-button {
+            margin-left: 10px;
+            padding: 8px 12px;
+            font-size: 16px;
+        }
+        #addImageButton {
+            margin-top: 10px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        #configOutput {
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px;
+            font-size: 16px;
+        }
+        #generateButton, #downloadButton {
+            width: auto;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="number"] {
+            padding: 8px;
+            font-size: 16px;
+            width: 100px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fully Kiosk Browser Config Updater</h1>
+    
+    <div class="section">
+        <h2>Step 1: Upload Current Config JSON File</h2>
+        <input type="file" id="jsonFileInput" accept=".json">
+    </div>
+    
+    <div class="section">
+        <h2>Step 2: Enter Image URLs for Screensaver Playlist</h2>
+        <div id="imageUrlFields">
+            <div class="image-url-field">
+                <input type="text" placeholder="Enter image URL" class="image-url-input">
+                <button type="button" class="remove-button" onclick="removeImageField(this)">Remove</button>
+            </div>
+        </div>
+        <button type="button" id="addImageButton" onclick="addImageField()">Add Another Image</button>
+    </div>
+
+    <div class="section">
+        <h2>Step 3: Set Timer Between Images</h2>
+        <label for="nextItemTimerInput">Seconds between images (minimum 5 seconds):</label>
+        <input type="number" id="nextItemTimerInput" min="5" value="15">
+    </div>
+    
+    <div class="section">
+        <button id="generateButton" onclick="generateConfig()">Generate Updated Config</button>
+    </div>
+    
+    <div class="section">
+        <h2>Updated Config JSON:</h2>
+        <textarea id="configOutput" rows="20" readonly></textarea>
+        <br><br>
+        <button id="downloadButton" onclick="downloadConfig()">Download JSON File</button>
+    </div>
+
+    <script>
+        let originalConfig = null;
+
+        // Function to handle file upload
+        document.getElementById('jsonFileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+                    alert('Please upload a valid JSON file.');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        originalConfig = JSON.parse(e.target.result);
+                        alert('Config file loaded successfully.');
+                    } catch (error) {
+                        alert('Error parsing JSON file. Please check the file and try again.');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Function to add a new image URL input field
+        function addImageField() {
+            const imageUrlFields = document.getElementById('imageUrlFields');
+            const newField = document.createElement('div');
+            newField.className = 'image-url-field';
+            newField.innerHTML = `
+                <input type="text" placeholder="Enter image URL" class="image-url-input">
+                <button type="button" class="remove-button" onclick="removeImageField(this)">Remove</button>
+            `;
+            imageUrlFields.appendChild(newField);
+        }
+
+        // Function to remove an image URL input field
+        function removeImageField(button) {
+            const field = button.parentElement;
+            field.parentElement.removeChild(field);
+        }
+
+        // Function to generate the updated config
+        function generateConfig() {
+            if (!originalConfig) {
+                alert('Please upload a JSON config file first.');
+                return;
+            }
+
+            const imageUrlInputs = document.querySelectorAll('.image-url-input');
+            const urls = [];
+            let hasEmptyFields = false;
+
+            imageUrlInputs.forEach(input => {
+                const url = input.value.trim();
+                if (url) {
+                    urls.push(url);
+                } else {
+                    hasEmptyFields = true;
+                }
+            });
+
+            if (urls.length === 0) {
+                alert('Please enter at least one image URL.');
+                return;
+            }
+
+            if (hasEmptyFields) {
+                if (!confirm('Some image URL fields are empty. Do you want to proceed without them?')) {
+                    return;
+                }
+            }
+
+            // Get and validate the nextItemTimer value
+            const nextItemTimerInput = document.getElementById('nextItemTimerInput');
+            let nextItemTimer = parseInt(nextItemTimerInput.value, 10);
+
+            if (isNaN(nextItemTimer) || nextItemTimer < 5) {
+                alert('Please enter a valid number for seconds between images (minimum 5).');
+                nextItemTimerInput.focus();
+                return;
+            }
+
+            const playlistItems = urls.map(url => ({
+                type: 1,
+                url: url,
+                loopItem: false,
+                loopFile: false,
+                fileOrder: 0,
+                nextItemOnTouch: false,
+                nextFileOnTouch: false,
+                nextItemTimer: nextItemTimer,
+                nextImageFileTimer: 0,
+                nextVideoFileTimer: 0
+            }));
+
+            // Update the screensaverPlaylist key in the original config
+            originalConfig.screensaverPlaylist = JSON.stringify(playlistItems, null, 2);
+
+            // Convert the updated config object back to a JSON string
+            const updatedConfigJson = JSON.stringify(originalConfig, null, 4);
+            document.getElementById('configOutput').value = updatedConfigJson;
+
+            alert('Updated config generated successfully.');
+        }
+
+        // Function to download the updated config as a file
+        function downloadConfig() {
+            const configText = document.getElementById('configOutput').value;
+            if (!configText) {
+                alert('No config to download. Please generate the updated config first.');
+                return;
+            }
+            const blob = new Blob([configText], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'updated_config.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
